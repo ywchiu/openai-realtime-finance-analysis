@@ -30,6 +30,17 @@ import { isJsxOpeningLikeElement } from 'typescript';
 /**
  * Type for result from get_weather() function call
  */
+
+interface StockInfo {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  name: string;
+  advice: string;
+}
+
+
 interface Coordinates {
   lat: number;
   lng: number;
@@ -119,11 +130,7 @@ export function ConsolePage() {
   const [canPushToTalk, setCanPushToTalk] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
-  const [coords, setCoords] = useState<Coordinates | null>({
-    lat: 37.775593,
-    lng: -122.418137,
-  });
-  const [marker, setMarker] = useState<Coordinates | null>(null);
+  const [stockInfo, setStockInfo] = useState<StockInfo | null>(null);
 
   /**
    * Utility for formatting the timing of logs
@@ -202,11 +209,7 @@ export function ConsolePage() {
     setRealtimeEvents([]);
     setItems([]);
     setMemoryKv({});
-    setCoords({
-      lat: 37.775593,
-      lng: -122.418137,
-    });
-    setMarker(null);
+
 
     const client = clientRef.current;
     client.disconnect();
@@ -382,76 +385,55 @@ export function ConsolePage() {
     client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
 
     // Add tools
+
     client.addTool(
       {
-        name: 'set_memory',
-        description: 'Saves important data about the user into memory.',
+        name: 'getStockInfo',
+        description: 'Retrieves stock information, basic details, and provides buy/sell advice for a given stock symbol.',
         parameters: {
           type: 'object',
           properties: {
-            key: {
+            symbol: {
               type: 'string',
-              description:
-                'The key of the memory value. Always use lowercase and underscores, no other characters.',
-            },
-            value: {
-              type: 'string',
-              description: 'Value can be anything represented as a string',
+              description: 'The stock symbol to look up (e.g., AAPL for Apple Inc.)',
             },
           },
-          required: ['key', 'value'],
+          required: ['symbol'],
         },
       },
-      async ({ key, value }: { [key: string]: any }) => {
-        setMemoryKv((memoryKv) => {
-          const newKv = { ...memoryKv };
-          newKv[key] = value;
-          return newKv;
-        });
-        return { ok: true };
-      }
-    );
-    client.addTool(
-      {
-        name: 'get_weather',
-        description:
-          'Retrieves the weather for a given lat, lng coordinate pair. Specify a label for the location.',
-        parameters: {
-          type: 'object',
-          properties: {
-            lat: {
-              type: 'number',
-              description: 'Latitude',
-            },
-            lng: {
-              type: 'number',
-              description: 'Longitude',
-            },
-            location: {
-              type: 'string',
-              description: 'Name of the location',
-            },
-          },
-          required: ['lat', 'lng', 'location'],
-        },
-      },
-      async ({ lat, lng, location }: { [key: string]: any }) => {
-        setMarker({ lat, lng, location });
-        setCoords({ lat, lng, location });
-        const result = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m`
-        );
-        const json = await result.json();
-        const temperature = {
-          value: json.current.temperature_2m as number,
-          units: json.current_units.temperature_2m as string,
-        };
-        const wind_speed = {
-          value: json.current.wind_speed_10m as number,
-          units: json.current_units.wind_speed_10m as string,
-        };
-        setMarker({ lat, lng, location, temperature, wind_speed });
-        return json;
+      async ({ symbol }: { symbol: string }) => {
+        const API_KEY = '<SET API KEY HERE>'; // Replace with your actual API key
+        const OVERVIEW_URL = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`;
+        const QUOTE_URL = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+
+        try {
+          const [overviewResponse, quoteResponse] = await Promise.all([
+            fetch(OVERVIEW_URL),
+            fetch(QUOTE_URL)
+          ]);
+
+          const overviewData = await overviewResponse.json();
+          const quoteData = await quoteResponse.json();
+
+          const price = parseFloat(quoteData['Global Quote']['05. price']);
+          const change = parseFloat(quoteData['Global Quote']['09. change']);
+          const changePercent = parseFloat(quoteData['Global Quote']['10. change percent'].replace('%', ''));
+
+          const stockInfo: StockInfo = {
+            symbol: symbol,
+            price: price,
+            change: change,
+            changePercent: changePercent,
+            name: overviewData['Name'],
+            advice: changePercent > 0 ? 'Consider buying' : 'Consider selling',
+          };
+
+          setStockInfo(stockInfo);
+          return stockInfo;
+        } catch (error) {
+          console.error('Error fetching stock info:', error);
+          return { error: 'Failed to fetch stock information' };
+        }
       }
     );
 
@@ -692,36 +674,20 @@ export function ConsolePage() {
           </div>
         </div>
         <div className="content-right">
-          <div className="content-block map">
-            <div className="content-block-title">get_weather()</div>
+          <div className="content-block stock-info">
+            <div className="content-block-title">getStockInfo()</div>
             <div className="content-block-title bottom">
-              {marker?.location || 'not yet retrieved'}
-              {!!marker?.temperature && (
-                <>
-                  <br />
-                  🌡️ {marker.temperature.value} {marker.temperature.units}
-                </>
-              )}
-              {!!marker?.wind_speed && (
-                <>
-                  {' '}
-                  🍃 {marker.wind_speed.value} {marker.wind_speed.units}
-                </>
-              )}
+              {stockInfo ? stockInfo.name : 'Not yet retrieved'}
             </div>
             <div className="content-block-body full">
-              {coords && (
-                <Map
-                  center={[coords.lat, coords.lng]}
-                  location={coords.location}
-                />
+              {stockInfo && (
+                <div>
+                  <p>Symbol: {stockInfo.symbol}</p>
+                  <p>Price: ${stockInfo.price.toFixed(2)}</p>
+                  <p>Change: ${stockInfo.change.toFixed(2)} ({stockInfo.changePercent.toFixed(2)}%)</p>
+                  <p>Advice: {stockInfo.advice}</p>
+                </div>
               )}
-            </div>
-          </div>
-          <div className="content-block kv">
-            <div className="content-block-title">set_memory()</div>
-            <div className="content-block-body content-kv">
-              {JSON.stringify(memoryKv, null, 2)}
             </div>
           </div>
         </div>
