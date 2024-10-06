@@ -1,4 +1,4 @@
-Certainly! I'll create a README that incorporates the information from the original OpenAI Realtime Console and includes the additional details about the stock analysis functionality. Here's the revised README:
+English | [繁體中文](README_zh_tw.md)
 
 # Realtime Stock Analysis Agent
 
@@ -27,16 +27,6 @@ This project is a real-time stock analysis agent that uses OpenAI's Realtime API
    ```
    npm install
    ```
-3. Set up environment variables:
-   - Create a `.env` file in the project root
-   - Add your OpenAI API key:
-     ```
-     OPENAI_API_KEY=your_openai_api_key_here
-     ```
-   - Add your Polygon.io API key:
-     ```
-     REACT_APP_POLYGON_KEY=your_polygon_api_key_here
-     ```
 
 ## Running the Application
 
