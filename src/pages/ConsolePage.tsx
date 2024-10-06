@@ -26,33 +26,32 @@ import { Map } from '../components/Map';
 
 import './ConsolePage.scss';
 import { isJsxOpeningLikeElement } from 'typescript';
+import { LineChart } from '../components/LineChart';
 
 /**
  * Type for result from get_weather() function call
  */
+
+interface NewsItem {
+  title: string;
+  url: string;
+  summary: string;
+}
+
 
 interface StockInfo {
   symbol: string;
   price: number;
   change: number;
   changePercent: number;
-  name: string;
-  advice: string;
+  historicalData: { date: string; price: number }[];
+  news: NewsItem[];
 }
 
 
-interface Coordinates {
-  lat: number;
-  lng: number;
-  location?: string;
-  temperature?: {
-    value: number;
-    units: string;
-  };
-  wind_speed?: {
-    value: number;
-    units: string;
-  };
+interface PolygonHistoricalDataItem {
+  t: number;  // Unix timestamp
+  c: number;  // Closing price
 }
 
 /**
@@ -78,6 +77,15 @@ export function ConsolePage() {
   if (apiKey !== '') {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }
+
+  const polygonKey = LOCAL_RELAY_SERVER_URL
+  ? ''
+  : localStorage.getItem('tmp::polygon_key') ||
+    prompt('Polygon Key') ||
+    '';
+if (polygonKey !== '') {
+  localStorage.setItem('tmp::polygon_key', polygonKey);
+}
 
   /**
    * Instantiate:
@@ -159,8 +167,15 @@ export function ConsolePage() {
   const resetAPIKey = useCallback(() => {
     const apiKey = prompt('OpenAI API Key');
     if (apiKey !== null) {
-      localStorage.clear();
       localStorage.setItem('tmp::voice_api_key', apiKey);
+      window.location.reload();
+    }
+  }, []);
+
+  const resetPolygonKey = useCallback(() => {
+    const polygonKey = prompt('Polygon Key');
+    if (polygonKey !== null) {
+      localStorage.setItem('tmp::polygon_key', polygonKey);
       window.location.reload();
     }
   }, []);
@@ -389,7 +404,7 @@ export function ConsolePage() {
     client.addTool(
       {
         name: 'getStockInfo',
-        description: 'Retrieves stock information, basic details, and provides buy/sell advice for a given stock symbol.',
+        description: 'Retrieves stock information, basic details for a given stock symbol.',
         parameters: {
           type: 'object',
           properties: {
@@ -401,31 +416,53 @@ export function ConsolePage() {
           required: ['symbol'],
         },
       },
+      
       async ({ symbol }: { symbol: string }) => {
-        const API_KEY = '<SET API KEY HERE>'; // Replace with your actual API key
-        const OVERVIEW_URL = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEY}`;
-        const QUOTE_URL = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+
+        const BASE_URL = 'https://api.polygon.io';
+        const POLYGON_KEY  =  polygonKey;
+        
+        const HISTORICAL_URL = `${BASE_URL}/v2/aggs/ticker/${symbol}/range/1/day/${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}/${new Date().toISOString().split('T')[0]}?apiKey=${POLYGON_KEY}`;
+        const NEWS_URL = `${BASE_URL}/v2/reference/news?ticker=${symbol}&apiKey=${POLYGON_KEY}`;
 
         try {
-          const [overviewResponse, quoteResponse] = await Promise.all([
-            fetch(OVERVIEW_URL),
-            fetch(QUOTE_URL)
+          const [historicalResponse,newsResponse] = await Promise.all([
+            
+            fetch(HISTORICAL_URL),
+            fetch(NEWS_URL)
           ]);
 
-          const overviewData = await overviewResponse.json();
-          const quoteData = await quoteResponse.json();
+          const [historicalData, newsData] = await Promise.all([
+            historicalResponse.json(),
+            newsResponse.json()
+          ]);
 
-          const price = parseFloat(quoteData['Global Quote']['05. price']);
-          const change = parseFloat(quoteData['Global Quote']['09. change']);
-          const changePercent = parseFloat(quoteData['Global Quote']['10. change percent'].replace('%', ''));
+          const latestData = historicalData['results'].slice(-2);
+          const latestPrice = parseFloat(latestData[1].c);
+          const previousPrice = parseFloat(latestData[0].c);
+          
+          const price = latestPrice;
+          const change = latestPrice - previousPrice;
+          const changePercent = (change / previousPrice) * 100;
+          const dailyTimeSeries = historicalData['results'];
+          const historicalPrices = historicalData.results.map((item: PolygonHistoricalDataItem) => ({
+            date: new Date(item.t).toISOString().split('T')[0],
+            price: item.c
+          }));
+
+          const news: NewsItem[] = newsData.results.slice(0, 5).map((item: any) => ({
+            title: item.title,
+            url: item.article_url,
+            summary: item.description
+          }));
 
           const stockInfo: StockInfo = {
             symbol: symbol,
             price: price,
             change: change,
             changePercent: changePercent,
-            name: overviewData['Name'],
-            advice: changePercent > 0 ? 'Consider buying' : 'Consider selling',
+            historicalData: historicalPrices,
+            news: news,
           };
 
           setStockInfo(stockInfo);
@@ -490,7 +527,7 @@ export function ConsolePage() {
       <div className="content-top">
         <div className="content-title">
           <img src="/openai-logomark.svg" />
-          <span>realtime console</span>
+          <span>Realtime Stock Analysis Agent</span>
         </div>
         <div className="content-api-key">
           {!LOCAL_RELAY_SERVER_URL && (
@@ -500,6 +537,17 @@ export function ConsolePage() {
               buttonStyle="flush"
               label={`api key: ${apiKey.slice(0, 3)}...`}
               onClick={() => resetAPIKey()}
+            />
+          )}
+        </div>
+        <div className="alphavantage-api-key">
+          {!LOCAL_RELAY_SERVER_URL && (
+            <Button
+              icon={Edit}
+              iconPosition="end"
+              buttonStyle="flush"
+              label={`Polygon key: ${polygonKey.slice(0, 3)}...`}
+              onClick={() => resetPolygonKey()}
             />
           )}
         </div>
@@ -674,22 +722,30 @@ export function ConsolePage() {
           </div>
         </div>
         <div className="content-right">
-          <div className="content-block stock-info">
-            <div className="content-block-title">getStockInfo()</div>
-            <div className="content-block-title bottom">
-              {stockInfo ? stockInfo.name : 'Not yet retrieved'}
-            </div>
-            <div className="content-block-body full">
-              {stockInfo && (
-                <div>
-                  <p>Symbol: {stockInfo.symbol}</p>
-                  <p>Price: ${stockInfo.price.toFixed(2)}</p>
-                  <p>Change: ${stockInfo.change.toFixed(2)} ({stockInfo.changePercent.toFixed(2)}%)</p>
-                  <p>Advice: {stockInfo.advice}</p>
-                </div>
-              )}
-            </div>
+        <div className="content-block stock-info">
+          <div className="content-block-title bottom">
           </div>
+          <div className="content-block-body full">
+            {stockInfo && (
+              <div>
+                <p>Symbol: {stockInfo.symbol}</p>
+                <p>Price: ${stockInfo.price.toFixed(2)}</p>
+                <p>Change: ${stockInfo.change.toFixed(2)} ({stockInfo.changePercent.toFixed(2)}%)</p>
+                <LineChart data={stockInfo.historicalData} />
+                <h3>Latest News:</h3>
+                <ul>
+                  {stockInfo.news.map((item, index) => (
+                    <li key={index}>
+                      <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a>
+                      <p>{item.summary}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+          
         </div>
       </div>
     </div>
