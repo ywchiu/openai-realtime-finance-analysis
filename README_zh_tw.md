@@ -2,6 +2,11 @@
 
 # 即時股票分析助手
 
+<video width="600" controls>
+  <source src="./demo/realtime-stock-analysis-zh.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
 這個專案是一個即時股票分析助手，使用 OpenAI 的 Realtime API 和 Polygon.io 的金融資料 API 來提供最新的股票資訊和分析。
 
 ## 功能特色
