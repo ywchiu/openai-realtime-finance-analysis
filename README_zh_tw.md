@@ -2,7 +2,11 @@
 
 # 即時股票分析助手
 
-[![Watch the video](https://img.youtube.com/vi/ncOrwHwNKTo/0.jpg)](https://www.youtube.com/watch?v=ncOrwHwNKTo)
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=ncOrwHwNKTo">
+    <img src="https://img.youtube.com/vi/ncOrwHwNKTo/0.jpg" alt="Watch the video">
+  </a>
+</div>
 
 
 這個專案是一個即時股票分析助手，使用 OpenAI 的 Realtime API 和 Polygon.io 的金融資料 API 來提供最新的股票資訊和分析。
