@@ -3,7 +3,9 @@ English | [繁體中文](README_zh_tw.md)
 # Realtime Stock Analysis Agent
 
 <div align="center">
-  [![Watch the video](https://img.youtube.com/vi/KIJjdb3-kog/0.jpg)](https://www.youtube.com/watch?v=KIJjdb3-kog)
+  <a href="https://www.youtube.com/watch?v=KIJjdb3-kog">
+    <img src="https://img.youtube.com/vi/KIJjdb3-kog/0.jpg" alt="Watch the video">
+  </a>
 </div>
 
 
