@@ -2,10 +2,8 @@ English | [繁體中文](README_zh_tw.md)
 
 # Realtime Stock Analysis Agent
 
-<video width="600" controls>
-  <source src="./demo/realtime-stock-analysis.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+[![Watch the video](https://img.youtube.com/vi/KIJjdb3-kog/0.jpg)](https://www.youtube.com/watch?v=KIJjdb3-kog)
+
 
 This project is a real-time stock analysis agent that uses OpenAI's Realtime API and Polygon.io's financial data API to provide up-to-date stock information and analysis. It is based on and extends the [OpenAI Realtime Console](https://github.com/openai/openai-realtime-console).
 
